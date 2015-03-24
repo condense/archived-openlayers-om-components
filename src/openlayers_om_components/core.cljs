@@ -1,6 +1,5 @@
 (ns ^:figwheel-always openlayers-om-components.core
-    (:require[om.core :as om :include-macros true]
-              [om.dom :as dom :include-macros true]
+    (:require [om.core :as om :include-macros true]
               [sablono.core :as html :refer-macros [html]]
               [openlayers-om-components.geographic-element :refer [BoxMap MultiBoxMap]]))
 
@@ -49,9 +48,11 @@
             [:div.col-sm-6
              [:h2 "BoxMap"]
              [:p "Allows one bounding box to be drawn (hold down shift)."]
-             (om/build BoxMap
-                       {:value     (clj->js (:extent data))
-                        :on-boxend #(om/update! data :extent %)})
+             (let [set-extent #(om/update! data :extent %)]
+               (om/build BoxMap
+                         {:value     (clj->js (:extent data))
+                          :on-boxend set-extent
+                          :on-boxchange set-extent}))
              [:p (om/build DisplayExtent (:extent data))]]
 
             [:div.col-sm-6
@@ -60,7 +61,8 @@
              [:p "Allows one bounding box to be drawn (hold down shift)."]
              (om/build MultiBoxMap
                        {:value     (map clj->js (:extents data))
-                        :on-boxend #(add-extent! (:extents data) %)})
+                        :on-boxend #(add-extent! (:extents data) %)
+                        :on-boxchange #()})
 
              [:table.table.table-hover
               [:thead [:tr

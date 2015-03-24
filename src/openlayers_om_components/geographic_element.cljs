@@ -1,6 +1,8 @@
 (ns openlayers-om-components.geographic-element
-  (:require-macros [openlayers-om-components.debug :refer [inspect]])
+  (:require-macros [cljs.core.async.macros :refer [go-loop]]
+                   [openlayers-om-components.debug :refer [inspect]])
   (:require ol.Map
+            ol.Collection
             ol.layer.Tile
             ol.View
             ol.proj
@@ -12,11 +14,14 @@
             ol.style.Stroke
             ol.style.Circle
             ol.interaction.Draw
-            ol.interaction.Modify
+            ol.interaction.Pointer
+            ol.interaction.Select
+            ol.interaction.Scale
+            ol.interaction.Translate
             ol.events.condition
             ol.geom.Polygon
+            [cljs.core.async :as async]
             [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]
             [sablono.core :as html :refer-macros [html]]))
 
 
@@ -59,6 +64,25 @@
       (.on "boxend" #(on-boxend (extent! %))))
     my-dragbox))
 
+(defn features<-event [features e]
+  (.clear features)
+  (.. e -map (forEachFeatureAtPixel (.-pixel e) #(.push features %))))
+
+(defn hover-interaction []
+  (let [features (ol.Collection.)
+        interaction
+        (ol.interaction.Pointer.
+          #js {:handleMoveEvent (partial features<-event features)})]
+    ;; mimic OpenLayers API convention
+    (set! (.-getFeatures interaction) (constantly features))
+    interaction))
+
+(defn features->chan [features topic & [chan]]
+  (let [chan (or chan (async/chan))]
+    (doto features
+      (.on "add" #(async/put! chan [topic :add (.-element %)]))
+      (.on "remove" #(async/put! chan [topic :remove (.-element %)])))
+    chan))
 
 (defn init-map! [owner props]
   (let [node (om/get-node owner "map")
@@ -88,9 +112,21 @@
                                                     #js {:radius 7
                                                          :fill   (ol.style.Fill.
                                                                    #js {:color "#ffcc33"})})})})
+        select (ol.interaction.Select. #js {})
+        scale (ol.interaction.Scale. #js {:features (.getFeatures select)})
+        translate (ol.interaction.Translate. #js {:features (.getFeatures select)})
+        hover (hover-interaction)
+        interactions-chan (async/chan)
         map (ol.Map. #js {:layers #js [raster vectorLayer]
+                          :interactions #js [select scale translate hover]
                           :target node
                           :view   view})]
+    (->> interactions-chan
+         (features->chan (.getFeatures select) :select)
+         (features->chan (.getFeatures hover) :hover))
+    (go-loop [[topic action feature] (async/<! interactions-chan)]
+             (println topic action (.. feature getGeometry getExtent))
+             (recur (async/<! interactions-chan)))
     (do (.addInteraction map dragBox)
         (om/set-state! owner :map map)
         (om/set-state! owner :dragBox dragBox)
@@ -102,10 +138,16 @@
         invalid? (some js/isNaN (vals bboxNums))]
     (if-not invalid? bboxNums)))
 
-(defn add-bbox! [owner source extent]
+(defn add-bbox! [owner props source extent]
   (let [extent3857 (ol.proj.transformExtent extent "EPSG:4326" "EPSG:3857")
         polygon (ol.geom.Polygon.fromExtent extent3857)
-        feature (ol.Feature. polygon)]
+        feature (ol.Feature. polygon)
+        on-boxchange (get props :on-boxchange identity)]
+    (.on feature "change"
+         (fn [e]
+           (-> e .-target .getGeometry .getExtent
+               (ol.proj.transformExtent "EPSG:3857" "EPSG:4326")
+               on-boxchange)))
     (.addFeature source feature)))
 
 (defn fit-view! [owner]
@@ -114,11 +156,11 @@
         vectorSource (om/get-state owner :vectorSource)]
     (.fitExtent view (.getExtent vectorSource) (.getSize map))))
 
-(defn draw-bbox! [owner]
+(defn draw-bbox! [owner props]
   (let [vectorSource (om/get-state owner :vectorSource)]
     (.clear vectorSource)
     (when-let [bbox (om/get-props owner :value)]
-      (add-bbox! owner vectorSource bbox))))
+      (add-bbox! owner props vectorSource bbox))))
 
 (defn BoxMap [props owner]
   (reify
@@ -127,23 +169,25 @@
     (did-mount [_]
       (init-map! owner props)
       (.on (om/get-state owner :dragBox) "boxstart" #(.clear (om/get-state owner :vectorSource)))
-      (draw-bbox! owner)
-      (fit-view! owner))
+      (draw-bbox! owner props)
+      (fit-view! owner)
+      )
     om/IDidUpdate
     (did-update [_ _ _]
-      (draw-bbox! owner)
-      (fit-view! owner))
+      (draw-bbox! owner props)
+      ;(fit-view! owner)
+      )
     om/IRender
     (render [_]
       (println :Boxmap props)
       (html [:div.BoxMap.map {:ref "map"} nil]))))
 
-(defn draw-bboxes! [owner]
+(defn draw-bboxes! [owner props]
   (let [vectorSource (om/get-state owner :vectorSource)]
     (.clear vectorSource)
     (when-let [bboxes (om/get-props owner :value)]
       (doseq [bbox bboxes]
-        (add-bbox! owner vectorSource bbox)))))
+        (add-bbox! props owner vectorSource bbox)))))
 
 (defn MultiBoxMap [props owner]
   (reify
@@ -151,14 +195,15 @@
     om/IDidMount
     (did-mount [_]
       (init-map! owner props)
-      (draw-bboxes! owner)
-      ;(fit-view! owner)
+      (draw-bboxes! owner props)
+      (fit-view! owner)
       )
 
     om/IDidUpdate
     (did-update [_ _ _]
-      (draw-bboxes! owner)
-      (fit-view! owner))
+      (draw-bboxes! owner props)
+      ;(fit-view! owner)
+      )
 
     om/IRender
     (render [_]
