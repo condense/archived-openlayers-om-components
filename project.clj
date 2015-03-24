@@ -4,17 +4,16 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/clojurescript "0.0-2850"]
-                 [figwheel "0.2.5-SNAPSHOT"]
+  :dependencies [[org.clojure/clojure "1.7.0-alpha5"]
+                 [org.clojure/clojurescript "0.0-3126"]
+                 [figwheel "0.2.5"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [sablono "0.3.4"]
                  [org.omcljs/om "0.8.8"]
-                 [cljsjs/openlayers "3.2.0-0"]
-                 [sablono "0.3.3"]]
+                 [cljsjs/openlayers "3.2.0-0"]]
 
-  :plugins [[lein-cljsbuild "1.0.4"]
-            [lein-figwheel "0.2.5-SNAPSHOT"]]
+  :plugins [[lein-cljsbuild "1.0.5"]
+            [lein-figwheel "0.2.5"]]
 
   :source-paths ["src"]
 
@@ -27,6 +26,7 @@
                          :output-dir "resources/public/js/compiled/out"
                          :optimizations :none
                          :main openlayers-om-components.dev
+                         :libs ["lib/simplegeometry.js" "lib/transformflatgeom.js" "lib/scaleinteraction.js" "lib/translateinteraction.js"]
                          :asset-path "js/compiled/out"
                          :source-map true
                          :source-map-timestamp true
@@ -34,9 +34,12 @@
              {:id "min"
               :source-paths ["src"]
               :compiler {:output-to "resources/public/js/compiled/openlayers_om_components.js"
-                         :main openlayers-om-components.core                         
+                         :main openlayers-om-components.core
+                         :libs ["lib/simplegeometry.js" "lib/transformflatgeom.js" "lib/scaleinteraction.js" "lib/translateinteraction.js"]
+                         :externs ["ext/olx.js"]
                          :optimizations :advanced
-                         :pretty-print false}}]}
+                         :pretty-print false
+                         :elide-asserts true}}]}
 
   :figwheel {
              :http-server-root "public" ;; default and assumes "resources" 

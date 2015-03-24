@@ -1,0 +1,6 @@
+/.lein-failures
+/.idea
+/*-init.clj
+/target
+/resources/public/js/compiled
+/*.iml

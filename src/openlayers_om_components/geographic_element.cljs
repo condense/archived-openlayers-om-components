@@ -1,6 +1,7 @@
 (ns openlayers-om-components.geographic-element
   (:require-macros [openlayers-om-components.debug :refer [inspect]])
   (:require ol.Map
+            ol.Collection
             ol.layer.Tile
             ol.View
             ol.proj
@@ -12,11 +13,14 @@
             ol.style.Stroke
             ol.style.Circle
             ol.interaction.Draw
-            ol.interaction.Modify
+            ol.interaction.Pointer
+            ol.interaction.Select
+            ol.interaction.Scale
+            ol.interaction.Translate
             ol.events.condition
             ol.geom.Polygon
+            [cljs.core.async :as async]
             [om.core :as om :include-macros true]
-            [om.dom :as dom :include-macros true]
             [sablono.core :as html :refer-macros [html]]))
 
 
@@ -59,6 +63,25 @@
       (.on "boxend" #(on-boxend (extent! %))))
     my-dragbox))
 
+(defn features<-event [features e]
+  (.clear features)
+  (.. e -map (forEachFeatureAtPixel (.-pixel e) #(.push features %))))
+
+(defn hover-interaction []
+  (let [features (ol.Collection.)
+        interaction
+        (ol.interaction.Pointer.
+          #js {:handleMoveEvent (partial features<-event features)})]
+    ;; mimic OpenLayers API convention
+    (set! (.-getFeatures interaction) (constantly features))
+    interaction))
+
+(defn features->chan [features topic & [chan]]
+  (let [chan (or chan (async/chan))]
+    (doto features
+      (.on "add" #(async/put! chan [topic :add (.-element %)]))
+      (.on "remove" #(async/put! chan [topic :remove (.-element %)])))
+    chan))
 
 (defn init-map! [owner props]
   (let [node (om/get-node owner "map")
@@ -88,10 +111,20 @@
                                                     #js {:radius 7
                                                          :fill   (ol.style.Fill.
                                                                    #js {:color "#ffcc33"})})})})
+        select (ol.interaction.Select. #js {})
+        scale (ol.interaction.Scale. #js {:features (.getFeatures select)})
+        translate (ol.interaction.Translate. #js {:features (.getFeatures select)})
+        hover (hover-interaction)
+        interactions-chan (async/chan)
         map (ol.Map. #js {:layers #js [raster vectorLayer]
+                          :interactions #js [select scale translate hover]
                           :target node
                           :view   view})]
+    (->> interactions-chan
+         (features->chan (.getFeatures select) :select)
+         (features->chan (.getFeatures hover) :hover))
     (do (.addInteraction map dragBox)
+        (om/set-state! owner :interactions-mult (async/mult interactions-chan))
         (om/set-state! owner :map map)
         (om/set-state! owner :dragBox dragBox)
         (om/set-state! owner :view view)
