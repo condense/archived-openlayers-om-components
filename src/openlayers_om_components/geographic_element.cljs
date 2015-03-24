@@ -112,14 +112,15 @@
                    #js {:features (.getFeatures select)})
         hover (hover-interaction)
         map (ol.Map. #js {:layers #js [raster vectorLayer]
-                          :interactions #js [select scale translate hover]
                           :target node
                           :view   view})]
-    (do (.addInteraction map dragBox)
-        (om/set-state! owner :map map)
-        (om/set-state! owner :dragBox dragBox)
-        (om/set-state! owner :view view)
-        (om/set-state! owner :vectorSource vectorSource))))
+    (doseq [i [dragBox select scale translate hover]]
+      (.addInteraction map i))
+    (doto owner
+      (om/set-state! :map map)
+      (om/set-state! :dragBox dragBox)
+      (om/set-state! :view view)
+      (om/set-state! :vectorSource vectorSource))))
 
 (defn bbox-value [bbox]
   (let [bboxNums (fmap js/parseFloat bbox)
