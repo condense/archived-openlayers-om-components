@@ -33,8 +33,8 @@
              "South: " southBoundLatitude ", "
              "West: " westBoundLongitude]))))
 
-(defn add-extent! [marks extent]
-  (om/transact! marks #(conj % [:box (js->clj extent)])))
+(defn add-mark! [marks mode coords]
+  (om/transact! marks #(conj % [mode (js->clj coords)])))
 
 (defn del-mark! [marks mark]
   (om/transact! marks #(vec (remove #{mark} %))))
@@ -53,16 +53,18 @@
            [:p "Allows one bounding box to be drawn (hold down shift)."]
            (om/build BoxMap
                      {:value     [mark]
-                      :on-boxend #(om/update! mark [:box (js->clj %)])})
+                      :on-boxend #(om/update! mark [:box (js->clj %)])
+                      :on-click #(om/update! mark [:point (js->clj %)])})
            [:p (om/build DisplayExtent (mark 1))]]
 
           [:div.col-sm-6
 
            [:h2 "MultiBoxMap"]
-           [:p "Allows one bounding box to be drawn (hold down shift)."]
+           [:p "Allows multiple bounding box to be drawn (hold down shift)."]
            (om/build BoxMap
                      {:value     marks
-                      :on-boxend #(add-extent! marks %)})
+                      :on-boxend #(add-mark! marks :box %)
+                      :on-click #(add-mark! marks :point %)})
 
            [:table.table.table-hover
             [:thead [:tr

@@ -106,7 +106,7 @@
                                      #js {:radius 7
                                           :fill   (ol.style.Fill.
                                                    #js {:color "#ffcc33"})})})})
-        select (ol.interaction.Select. #js {})
+        select (ol.interaction.Select. #js {:toggleCondition ol.events.condition.never})
         scale (ol.interaction.Scale. #js {:features (.getFeatures select)})
         translate (ol.interaction.Translate.
                    #js {:features (.getFeatures select)})
@@ -114,6 +114,13 @@
         map (ol.Map. #js {:layers #js [raster vectorLayer]
                           :target node
                           :view   view})]
+    (.on map "click" (fn [e]
+                       (when (and (.. e -browserEvent -shiftKey)
+                                  (zero? (.. e -browserEvent -button))
+                                  (:on-click props))
+                         ((:on-click props)
+                          (ol.proj.transform (.-coordinate e)
+                                             "EPSG:3857" "EPSG:4326")))))
     (doseq [i [dragBox select scale translate hover]]
       (.addInteraction map i))
     (doto owner
@@ -185,7 +192,7 @@
     (will-unmount [_]
       (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
 
-(defn BoxMap [props owner]
+(defn BoxMap [{:keys [on-click] :as props} owner]
   (reify
     om/IDisplayName (display-name [_] "BoxMap")
     om/IInitState
