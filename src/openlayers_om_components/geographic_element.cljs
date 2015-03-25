@@ -84,11 +84,6 @@
         view (ol.View. #js {:center #js [-11000000 4600000]
                             :zoom 4
                             :maxZoom 10})
-        on-boxstart (get props :on-boxstart identity)
-        on-boxend (get props :on-boxend identity)
-        dragBox (dragBox
-                 {:on-boxstart #(on-boxstart %)
-                  :on-boxend   #(on-boxend %)})
         vectorSource (ol.source.Vector.
                       #js {:projection (ol.proj.get "EPSG:4326")
                            :features   #js []})
@@ -111,6 +106,11 @@
         scale (ol.interaction.Scale. #js {:features selected})
         translate (ol.interaction.Translate. #js {:features selected})
         hover (hover-interaction)
+        on-boxstart (get props :on-boxstart identity)
+        on-boxend (get props :on-boxend identity)
+        dragBox (dragBox
+                 {:on-boxstart #(do (.clear selected) (on-boxstart %))
+                  :on-boxend   #(on-boxend %)})
         map (ol.Map. #js {:layers #js [raster vectorLayer]
                           :target node
                           :view   view})]
@@ -118,6 +118,7 @@
                        (when (and (.. e -browserEvent -shiftKey)
                                   (zero? (.. e -browserEvent -button))
                                   (:on-click props))
+                         (.clear selected)
                          ((:on-click props)
                           (ol.proj.transform (.-coordinate e)
                                              "EPSG:3857" "EPSG:4326")))))
@@ -125,7 +126,6 @@
       (.addInteraction map i))
     (doto owner
       (om/set-state! :map map)
-      (om/set-state! :selected selected)
       (om/set-state! :dragBox dragBox)
       (om/set-state! :view view)
       (om/set-state! :vectorSource vectorSource))))
@@ -193,7 +193,7 @@
     (will-unmount [_]
       (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
 
-(defn BoxMap [{:keys [on-click] :as props} owner]
+(defn BoxMap [props owner]
   (reify
     om/IDisplayName (display-name [_] "BoxMap")
     om/IInitState
@@ -206,10 +206,7 @@
           (.on "add" #(when-let [v (om/get-state owner :vectorSource)]
                         (.addFeature v (.-element %))))
           (.on "remove" #(when-let [v (om/get-state owner :vectorSource)]
-                           (let [feature (.-element %)
-                                 selected (om/get-state owner :selected)]
-                             (.removeFeature v feature)
-                             (.remove selected feature)))))
+                           (.removeFeature v (.-element %)))))
         {:source source}))
     om/IDidMount
     (did-mount [_]
