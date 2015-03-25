@@ -1,6 +1,5 @@
 (ns openlayers-om-components.geographic-element
-  (:require-macros [cljs.core.async.macros :refer [go-loop]]
-                   [openlayers-om-components.debug :refer [inspect]])
+  (:require-macros [openlayers-om-components.debug :refer [inspect]])
   (:require ol.Map
             ol.Collection
             ol.layer.Tile
@@ -21,7 +20,6 @@
             ol.events.condition
             ol.geom.Polygon
             ol.geom.Point
-            [cljs.core.async :as async]
             [om.core :as om :include-macros true]
             [sablono.core :as html :refer-macros [html]]))
 
@@ -84,11 +82,6 @@
         view (ol.View. #js {:center #js [-11000000 4600000]
                             :zoom 4
                             :maxZoom 10})
-        on-boxstart (get props :on-boxstart identity)
-        on-boxend (get props :on-boxend identity)
-        dragBox (dragBox
-                 {:on-boxstart #(on-boxstart %)
-                  :on-boxend   #(on-boxend %)})
         vectorSource (ol.source.Vector.
                       #js {:projection (ol.proj.get "EPSG:4326")
                            :features   #js []})
@@ -106,11 +99,17 @@
                                      #js {:radius 7
                                           :fill   (ol.style.Fill.
                                                    #js {:color "#ffcc33"})})})})
-        select (ol.interaction.Select. #js {:toggleCondition ol.events.condition.never})
-        scale (ol.interaction.Scale. #js {:features (.getFeatures select)})
-        translate (ol.interaction.Translate.
-                   #js {:features (.getFeatures select)})
+        select (ol.interaction.Select.
+                #js {:toggleCondition ol.events.condition.never})
+        selected (.getFeatures select)
+        scale (ol.interaction.Scale. #js {:features selected})
+        translate (ol.interaction.Translate. #js {:features selected})
         hover (hover-interaction)
+        on-boxstart (get props :on-boxstart identity)
+        on-boxend (get props :on-boxend identity)
+        dragBox (dragBox
+                 {:on-boxstart #(on-boxstart %)
+                  :on-boxend   #(on-boxend %)})
         map (ol.Map. #js {:layers #js [raster vectorLayer]
                           :target node
                           :view   view})]
@@ -124,6 +123,7 @@
     (doseq [i [dragBox select scale translate hover]]
       (.addInteraction map i))
     (doto owner
+      (om/set-state! :selected selected)
       (om/set-state! :map map)
       (om/set-state! :dragBox dragBox)
       (om/set-state! :view view)
@@ -140,7 +140,7 @@
         vectorSource (om/get-state owner :vectorSource)]
     (.fitExtent view (.getExtent vectorSource) (.getSize map))))
 
-(defmulti create-mark-feature (fn [props] (first props)))
+(defmulti create-mark-feature first)
 
 (defmethod create-mark-feature :box [[_ extent :as props]]
   (let [feature (-> extent clj->js
@@ -168,31 +168,48 @@
                (#(om/update! props [:point %])))))
     feature))
 
+(defmulti update-mark-feature (fn [props feature] (first props)))
+
+(defmethod update-mark-feature :box [[_ extent] feature]
+  (let [extent (-> extent clj->js
+                   (ol.proj.transformExtent "EPSG:4326" "EPSG:3857"))]
+    (.. feature
+        getGeometry
+        (setCoordinates
+         (.getCoordinates (ol.geom.Polygon.fromExtent extent))))))
+
+(defmethod update-mark-feature :point [[_ coords] feature]
+  (.. feature
+      getGeometry
+      (setCoordinates
+       (-> coords clj->js (ol.proj.transform "EPSG:4326" "EPSG:3857")))))
+
+(defn replace-mark-feature [props owner]
+  (let [source (om/get-state owner :source)
+        feature (create-mark-feature props)]
+    (when-let [feature (om/get-state owner :feature)]
+      (.remove source feature))
+    (.push (om/get-state owner :source) feature)
+    (om/set-state! owner :feature feature)))
+
 (defn Mark [props owner]
   (reify
     om/IDisplayName (display-name [_] "Mark")
     om/IRender (render [_])
     om/IDidMount
     (did-mount [_]
-      (let [feature (create-mark-feature props)
-            source (om/get-state owner :source)]
-        (.push source feature)
-        (om/set-state! owner :feature feature)))
+      (replace-mark-feature props owner))
     om/IDidUpdate
     (did-update [_ prev-props _]
       (when-not (= props prev-props)
-        ;; REVIEW possible optimization:
-        ;; only update coordinates when mode is unchanged
-        (let [source (om/get-state owner :source)
-              feature (create-mark-feature props)]
-          (.remove source (om/get-state owner :feature))
-          (.push (om/get-state owner :source) feature)
-          (om/set-state! owner :feature feature))))
+        (if (= (props 0) (prev-props 0))
+          (update-mark-feature props (om/get-state owner :feature))
+          (replace-mark-feature props owner))))
     om/IWillUnmount
     (will-unmount [_]
       (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
 
-(defn BoxMap [{:keys [on-click] :as props} owner]
+(defn BoxMap [props owner]
   (reify
     om/IDisplayName (display-name [_] "BoxMap")
     om/IInitState
@@ -200,22 +217,23 @@
       ;; Mark's did-mount is called before init-map!
       ;; → before vectorSource created
       ;; so we make proxy: observable collection
-      (let [source (ol.Collection.)
-            update-vector-source
-            #(when-let [v (om/get-state owner :vectorSource)]
-               (doto v (.clear) (.addFeatures (.getArray source))))]
+      (let [source (ol.Collection.)]
         (doto source
-          (.on "add" update-vector-source)
-          (.on "remove" update-vector-source))
+          (.on "add" #(when-let [v (om/get-state owner :vectorSource)]
+                        (let [feature (.-element %)
+                              selected (om/get-state owner :selected)]
+                          (.addFeature v feature)
+                          (doto selected (.clear) (.push feature)))))
+          (.on "remove" #(when-let [v (om/get-state owner :vectorSource)]
+                           (let [feature (.-element %)]
+                             (.remove (om/get-state owner :selected) feature)
+                             (.removeFeature v feature)))))
         {:source source}))
     om/IDidMount
     (did-mount [_]
       (init-map! owner props)
-      (let [v (om/get-state owner :vectorSource)
-            source (om/get-state owner :source)]
-        (doto v (.clear) (.addFeatures (.getArray source))))
-      ;(.on (om/get-state owner :dragBox)
-      ; "boxstart" #(.clear (om/get-state owner :vectorSource)))
+      (.addFeatures (om/get-state owner :vectorSource)
+                    (.getArray (om/get-state owner :source)))
       (fit-view! owner))
 
     om/IDidUpdate
