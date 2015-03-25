@@ -1,6 +1,5 @@
 (ns openlayers-om-components.geographic-element
-  (:require-macros [cljs.core.async.macros :refer [go-loop]]
-                   [openlayers-om-components.debug :refer [inspect]])
+  (:require-macros [openlayers-om-components.debug :refer [inspect]])
   (:require ol.Map
             ol.Collection
             ol.layer.Tile
@@ -21,7 +20,6 @@
             ol.events.condition
             ol.geom.Polygon
             ol.geom.Point
-            [cljs.core.async :as async]
             [om.core :as om :include-macros true]
             [sablono.core :as html :refer-macros [html]]))
 
@@ -101,7 +99,8 @@
                                      #js {:radius 7
                                           :fill   (ol.style.Fill.
                                                    #js {:color "#ffcc33"})})})})
-        select (ol.interaction.Select. #js {:toggleCondition ol.events.condition.never})
+        select (ol.interaction.Select.
+                #js {:toggleCondition ol.events.condition.never})
         selected (.getFeatures select)
         scale (ol.interaction.Scale. #js {:features selected})
         translate (ol.interaction.Translate. #js {:features selected})
@@ -172,7 +171,8 @@
 (defmulti update-mark-feature (fn [props feature] (first props)))
 
 (defmethod update-mark-feature :box [[_ extent] feature]
-  (let [extent (-> extent clj->js (ol.proj.transformExtent "EPSG:4326" "EPSG:3857"))]
+  (let [extent (-> extent clj->js
+                   (ol.proj.transformExtent "EPSG:4326" "EPSG:3857"))]
     (.. feature
         getGeometry
         (setCoordinates
@@ -207,8 +207,7 @@
           (replace-mark-feature props owner))))
     om/IWillUnmount
     (will-unmount [_]
-      (let [feature (om/get-state owner :feature)]
-        (.remove (om/get-state owner :source) feature)))))
+      (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
 
 (defn BoxMap [props owner]
   (reify
