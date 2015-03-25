@@ -1,6 +1,6 @@
 (defproject openlayers-om-components "0.1.0-SNAPSHOT"
-  :description "FIXME: write this!"
-  :url "http://example.com/FIXME"
+  :description "Om Components which leverage Openlayers to provide interative maps for use in data capture apps"
+  :url "https://github.com/condense/openlayers-om-components"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
