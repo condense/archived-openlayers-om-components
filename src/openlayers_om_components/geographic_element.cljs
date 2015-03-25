@@ -109,7 +109,7 @@
         on-boxstart (get props :on-boxstart identity)
         on-boxend (get props :on-boxend identity)
         dragBox (dragBox
-                 {:on-boxstart #(do (.clear selected) (on-boxstart %))
+                 {:on-boxstart #(on-boxstart %)
                   :on-boxend   #(on-boxend %)})
         map (ol.Map. #js {:layers #js [raster vectorLayer]
                           :target node
@@ -118,7 +118,6 @@
                        (when (and (.. e -browserEvent -shiftKey)
                                   (zero? (.. e -browserEvent -button))
                                   (:on-click props))
-                         (.clear selected)
                          ((:on-click props)
                           (ol.proj.transform (.-coordinate e)
                                              "EPSG:3857" "EPSG:4326")))))
@@ -142,7 +141,7 @@
         vectorSource (om/get-state owner :vectorSource)]
     (.fitExtent view (.getExtent vectorSource) (.getSize map))))
 
-(defmulti create-mark-feature (fn [props] (first props)))
+(defmulti create-mark-feature first)
 
 (defmethod create-mark-feature :box [[_ extent :as props]]
   (let [feature (-> extent clj->js
@@ -170,30 +169,45 @@
                (#(om/update! props [:point %])))))
     feature))
 
+(defmulti update-mark-feature (fn [props feature] (first props)))
+
+(defmethod update-mark-feature :box [[_ extent] feature]
+  (let [extent (-> extent clj->js (ol.proj.transformExtent "EPSG:4326" "EPSG:3857"))]
+    (.. feature
+        getGeometry
+        (setCoordinates
+         (.getCoordinates (ol.geom.Polygon.fromExtent extent))))))
+
+(defmethod update-mark-feature :point [[_ coords] feature]
+  (.. feature
+      getGeometry
+      (setCoordinates
+       (-> coords clj->js (ol.proj.transform "EPSG:4326" "EPSG:3857")))))
+
+(defn replace-mark-feature [props owner]
+  (let [source (om/get-state owner :source)
+        feature (create-mark-feature props)]
+    (when-let [feature (om/get-state owner :feature)]
+      (.remove source feature))
+    (.push (om/get-state owner :source) feature)
+    (om/set-state! owner :feature feature)))
+
 (defn Mark [props owner]
   (reify
     om/IDisplayName (display-name [_] "Mark")
     om/IRender (render [_])
     om/IDidMount
     (did-mount [_]
-      (let [feature (create-mark-feature props)
-            source (om/get-state owner :source)]
-        (.push source feature)
-        (om/set-state! owner :feature feature)))
+      (replace-mark-feature props owner))
     om/IDidUpdate
     (did-update [_ prev-props _]
       (when-not (= props prev-props)
-        ;; REVIEW possible optimization:
-        ;; only update coordinates when mode is unchanged
-        (let [source (om/get-state owner :source)
-              feature (create-mark-feature props)]
-          (.remove source (om/get-state owner :feature))
-          (.push (om/get-state owner :source) feature)
-          (om/set-state! owner :feature feature))))
+        (if (= (props 0) (prev-props 0))
+          (update-mark-feature props (om/get-state owner :feature))
+          (replace-mark-feature props owner))))
     om/IWillUnmount
     (will-unmount [_]
       (let [feature (om/get-state owner :feature)]
-        (.remove (om/get-state owner :selected) feature)
         (.remove (om/get-state owner :source) feature)))))
 
 (defn BoxMap [props owner]
@@ -207,9 +221,14 @@
       (let [source (ol.Collection.)]
         (doto source
           (.on "add" #(when-let [v (om/get-state owner :vectorSource)]
-                        (.addFeature v (.-element %))))
+                        (let [feature (.-element %)
+                              selected (om/get-state owner :selected)]
+                          (.addFeature v feature)
+                          (doto selected (.clear) (.push feature)))))
           (.on "remove" #(when-let [v (om/get-state owner :vectorSource)]
-                           (.removeFeature v (.-element %)))))
+                           (let [feature (.-element %)]
+                             (.remove (om/get-state owner :selected) feature)
+                             (.removeFeature v feature)))))
         {:source source}))
     om/IDidMount
     (did-mount [_]
@@ -228,6 +247,5 @@
       (html [:div.map {:ref "map"}
              (om/build-all Mark
                            (:value props)
-                           {:state
-                            {:source (om/get-state owner :source)
-                             :selected (om/get-state owner :selected)}})]))))
+                           {:init-state
+                            {:source (om/get-state owner :source)}})]))))
