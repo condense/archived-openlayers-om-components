@@ -68,6 +68,7 @@
 
            [:table.table.table-hover
             [:thead [:tr
+                     [:th "Type"]
                      [:th "North"]
                      [:th "West"]
                      [:th "South"]
@@ -89,7 +90,7 @@
                   :point (list
                           [:td (.toFixed southBoundLatitude 3)]
                           [:td (.toFixed westBoundLongitude 3)]
-                          [:td "×"] [:td "x"]))
+                          [:td "×"] [:td "×"]))
                 [:td [:button.btn.btn-xs
                       {:on-hover #()
                        :on-click #(del-mark! marks mark)}
