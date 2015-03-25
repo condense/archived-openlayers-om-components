@@ -107,9 +107,9 @@
                                           :fill   (ol.style.Fill.
                                                    #js {:color "#ffcc33"})})})})
         select (ol.interaction.Select. #js {:toggleCondition ol.events.condition.never})
-        scale (ol.interaction.Scale. #js {:features (.getFeatures select)})
-        translate (ol.interaction.Translate.
-                   #js {:features (.getFeatures select)})
+        selected (.getFeatures select)
+        scale (ol.interaction.Scale. #js {:features selected})
+        translate (ol.interaction.Translate. #js {:features selected})
         hover (hover-interaction)
         map (ol.Map. #js {:layers #js [raster vectorLayer]
                           :target node
@@ -125,6 +125,7 @@
       (.addInteraction map i))
     (doto owner
       (om/set-state! :map map)
+      (om/set-state! :selected selected)
       (om/set-state! :dragBox dragBox)
       (om/set-state! :view view)
       (om/set-state! :vectorSource vectorSource))))
@@ -200,22 +201,21 @@
       ;; Mark's did-mount is called before init-map!
       ;; → before vectorSource created
       ;; so we make proxy: observable collection
-      (let [source (ol.Collection.)
-            update-vector-source
-            #(when-let [v (om/get-state owner :vectorSource)]
-               (doto v (.clear) (.addFeatures (.getArray source))))]
+      (let [source (ol.Collection.)]
         (doto source
-          (.on "add" update-vector-source)
-          (.on "remove" update-vector-source))
+          (.on "add" #(when-let [v (om/get-state owner :vectorSource)]
+                        (.addFeature v (.-element %))))
+          (.on "remove" #(when-let [v (om/get-state owner :vectorSource)]
+                           (let [feature (.-element %)
+                                 selected (om/get-state owner :selected)]
+                             (.removeFeature v feature)
+                             (.remove selected feature)))))
         {:source source}))
     om/IDidMount
     (did-mount [_]
       (init-map! owner props)
-      (let [v (om/get-state owner :vectorSource)
-            source (om/get-state owner :source)]
-        (doto v (.clear) (.addFeatures (.getArray source))))
-      ;(.on (om/get-state owner :dragBox)
-      ; "boxstart" #(.clear (om/get-state owner :vectorSource)))
+      (.addFeatures (om/get-state owner :vectorSource)
+                    (.getArray (om/get-state owner :source)))
       (fit-view! owner))
 
     om/IDidUpdate
