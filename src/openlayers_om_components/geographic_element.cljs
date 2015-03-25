@@ -125,6 +125,7 @@
     (doseq [i [dragBox select scale translate hover]]
       (.addInteraction map i))
     (doto owner
+      (om/set-state! :selected selected)
       (om/set-state! :map map)
       (om/set-state! :dragBox dragBox)
       (om/set-state! :view view)
@@ -191,7 +192,9 @@
           (om/set-state! owner :feature feature))))
     om/IWillUnmount
     (will-unmount [_]
-      (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
+      (let [feature (om/get-state owner :feature)]
+        (.remove (om/get-state owner :selected) feature)
+        (.remove (om/get-state owner :source) feature)))))
 
 (defn BoxMap [props owner]
   (reify
@@ -225,5 +228,6 @@
       (html [:div.map {:ref "map"}
              (om/build-all Mark
                            (:value props)
-                           {:init-state
-                            {:source (om/get-state owner :source)}})]))))
+                           {:state
+                            {:source (om/get-state owner :source)
+                             :selected (om/get-state owner :selected)}})]))))
