@@ -10,7 +10,7 @@
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [sablono "0.3.4"]
                  [org.omcljs/om "0.8.8"]
-                 [cljsjs/openlayers "3.2.0-0"]]
+                 [cljsjs/openlayers "3.3.0-0"]]
 
   :plugins [[lein-cljsbuild "1.0.5"]
             [lein-figwheel "0.2.5"]]
@@ -39,7 +39,9 @@
                          :externs ["ext/olx.js"]
                          :optimizations :advanced
                          :pretty-print false
-                         :elide-asserts true}}]}
+                         :elide-asserts true
+                         :closure-warnings {:externs-validation :off
+                                            :non-standard-jsdoc :off}}}]}
 
   :figwheel {
              :http-server-root "public" ;; default and assumes "resources" 
