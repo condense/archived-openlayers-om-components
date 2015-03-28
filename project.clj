@@ -1,10 +1,10 @@
-(defproject openlayers-om-components "0.1.0-SNAPSHOT"
-  :description "Om Components which leverage Openlayers to provide interative maps for use in data capture apps"
+(defproject condense/openlayers-om-components "0.1.0-SNAPSHOT"
+  :description "Om components which leverage Openlayers 3 to provide interative maps for use in data capture applications."
   :url "https://github.com/condense/openlayers-om-components"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
 
-  :dependencies [[org.clojure/clojure "1.7.0-alpha5"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.clojure/clojurescript "0.0-3126"]
                  [figwheel "0.2.5"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
