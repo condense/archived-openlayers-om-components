@@ -26,7 +26,6 @@
                          :output-dir "resources/public/js/compiled/out"
                          :optimizations :none
                          :main openlayers-om-components.dev
-                         :libs ["lib/simplegeometry.js" "lib/transformflatgeom.js" "lib/scaleinteraction.js" "lib/translateinteraction.js"]
                          :asset-path "js/compiled/out"
                          :source-map true
                          :source-map-timestamp true
@@ -35,8 +34,6 @@
               :source-paths ["src"]
               :compiler {:output-to "resources/public/js/compiled/openlayers_om_components.js"
                          :main openlayers-om-components.core
-                         :libs ["lib/simplegeometry.js" "lib/transformflatgeom.js" "lib/scaleinteraction.js" "lib/translateinteraction.js"]
-                         :externs ["ext/olx.js"]
                          :optimizations :advanced
                          :pretty-print false
                          :elide-asserts true
