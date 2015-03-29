@@ -14,7 +14,7 @@ We use Openlayers 3
 
 We use the CLJSJS Openlayers package as the basis of our integration 
 
-We are usign code from an active Openlayers PR for providing interactive transformations.  When this PR 
+We are using code from an active Openlayers PR for providing interactive transformations.  When this PR 
 is accepted the related code will be removed from our codebase.
 
 There might be value in add new components and evolving the ones we have to suit other common use cases.  
