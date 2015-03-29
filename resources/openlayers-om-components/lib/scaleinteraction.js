@@ -9,7 +9,7 @@ goog.require('ol.events.condition');
 goog.require('ol.geom.LineString');
 goog.require('ol.geom.Point');
 goog.require('ol.interaction.Pointer');
-
+goog.require('ol.geom.SimpleGeometry.scale');
 
 
 /**
