@@ -142,7 +142,7 @@
 
 (defmulti create-mark-feature first)
 
-(defmethod create-mark-feature :box [[_ extent :as props]]
+(defmethod create-mark-feature :box [[_ extent :as props] on-mark-change]
   (let [feature (-> extent clj->js
                     (ol.proj.transformExtent "EPSG:4326" "EPSG:3857")
                     ol.geom.Polygon.fromExtent
@@ -152,10 +152,10 @@
            (-> e .-target .getGeometry .getExtent
                (ol.proj.transformExtent "EPSG:3857" "EPSG:4326")
                js->clj
-               (#(om/update! props [:box %])))))
+               (#(on-mark-change [:box %])))))
     feature))
 
-(defmethod create-mark-feature :point [[_ coords :as props]]
+(defmethod create-mark-feature :point [[_ coords :as props] on-mark-change]
   (let [feature (-> coords clj->js
                     (ol.proj.transform "EPSG:4326" "EPSG:3857")
                     ol.geom.Point.
@@ -165,7 +165,7 @@
            (-> e .-target .getGeometry .getCoordinates
                (ol.proj.transform "EPSG:3857" "EPSG:4326")
                js->clj
-               (#(om/update! props [:point %])))))
+               (#(on-mark-change [:point %])))))
     feature))
 
 (defmulti update-mark-feature (fn [props feature] (first props)))
@@ -184,27 +184,27 @@
       (setCoordinates
        (-> coords clj->js (ol.proj.transform "EPSG:4326" "EPSG:3857")))))
 
-(defn replace-mark-feature [props owner]
+(defn replace-mark-feature [value owner]
   (let [source (om/get-state owner :source)
-        feature (create-mark-feature props)]
+        feature (create-mark-feature value (om/get-props owner :on-mark-change))]
     (when-let [feature (om/get-state owner :feature)]
       (.remove source feature))
     (.push (om/get-state owner :source) feature)
     (om/set-state! owner :feature feature)))
 
-(defn Mark [props owner]
+(defn Mark [{:keys [value]} owner]
   (reify
     om/IDisplayName (display-name [_] "Mark")
     om/IRender (render [_])
     om/IDidMount
     (did-mount [_]
-      (replace-mark-feature props owner))
+      (replace-mark-feature value owner))
     om/IDidUpdate
-    (did-update [_ prev-props _]
-      (when-not (= props prev-props)
-        (if (= (props 0) (prev-props 0))
-          (update-mark-feature props (om/get-state owner :feature))
-          (replace-mark-feature props owner))))
+    (did-update [_ {prev-value :value} _]
+      (when-not (= value prev-value)
+        (if (= (value 0) (prev-value 0))
+          (update-mark-feature value (om/get-state owner :feature))
+          (replace-mark-feature value owner))))
     om/IWillUnmount
     (will-unmount [_]
       (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
@@ -245,6 +245,10 @@
     (render [_]
       (html [:div.map {:ref "map"}
              (om/build-all Mark
-                           (:value props)
+                           (map-indexed
+                             (fn [idx value] {:value value
+                                              :idx idx
+                                              :on-mark-change (:on-mark-change props)})
+                             (:value props))
                            {:init-state
                             {:source (om/get-state owner :source)}})]))))

@@ -54,7 +54,8 @@
            (om/build BoxMap
                      {:value     [mark]
                       :on-boxend #(om/update! mark [:box (js->clj %)])
-                      :on-click #(om/update! mark [:point (js->clj %)])})
+                      :on-click  #(om/update! mark [:point (js->clj %)])
+                      :on-mark-change #(om/update! mark (js->clj %))})
            [:p (om/build DisplayExtent (mark 1))]]
 
           [:div.col-sm-6
@@ -64,7 +65,8 @@
            (om/build BoxMap
                      {:value     marks
                       :on-boxend #(add-mark! marks :box %)
-                      :on-click #(add-mark! marks :point %)})
+                      :on-click #(add-mark! marks :point %)
+                      :on-mark-change #(println :on-mark-change %)})
 
            [:table.table.table-hover
             [:thead [:tr
