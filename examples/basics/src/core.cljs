@@ -1,4 +1,4 @@
-(ns ^:figwheel-always openlayers-om-components.core
+(ns examples.basics.core
   (:require [om.core :as om :include-macros true]
             [sablono.core :as html :refer-macros [html]]
             [openlayers-om-components.geographic-element :refer [BoxMap]]))

@@ -38,7 +38,14 @@
                          :pretty-print false
                          :elide-asserts true
                          :closure-warnings {:externs-validation :off
-                                            :non-standard-jsdoc :off}}}]}
+                                            :non-standard-jsdoc :off}}}
+             {:id "basics"
+              :source-paths ["src" "examples/basics/src"]
+              :compiler {
+                         :output-to "examples/basics/main.js"
+                         :output-dir "examples/basics/out"
+                         :source-map true
+                         :optimizations :none}}]}
 
   :figwheel {
              :http-server-root "public" ;; default and assumes "resources" 
