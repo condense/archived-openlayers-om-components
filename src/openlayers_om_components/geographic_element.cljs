@@ -147,12 +147,13 @@
                     (ol.proj.transformExtent "EPSG:4326" "EPSG:3857")
                     ol.geom.Polygon.fromExtent
                     ol.Feature.)]
-    (.on feature "change"
-         (fn [e]
-           (-> e .-target .getGeometry .getExtent
-               (ol.proj.transformExtent "EPSG:3857" "EPSG:4326")
-               js->clj
-               (#(on-mark-change [:box %])))))
+    (when on-mark-change
+      (.on feature "change"
+           (fn [e]
+             (-> e .-target .getGeometry .getExtent
+                 (ol.proj.transformExtent "EPSG:3857" "EPSG:4326")
+                 js->clj
+                 (#(on-mark-change [:box %]))))))
     feature))
 
 (defmethod create-mark-feature :point [[_ coords :as props] on-mark-change]
@@ -160,12 +161,13 @@
                     (ol.proj.transform "EPSG:4326" "EPSG:3857")
                     ol.geom.Point.
                     ol.Feature.)]
-    (.on feature "change"
-         (fn [e]
-           (-> e .-target .getGeometry .getCoordinates
-               (ol.proj.transform "EPSG:3857" "EPSG:4326")
-               js->clj
-               (#(on-mark-change [:point %])))))
+    (when on-mark-change
+      (.on feature "change"
+           (fn [e]
+             (-> e .-target .getGeometry .getCoordinates
+                 (ol.proj.transform "EPSG:3857" "EPSG:4326")
+                 js->clj
+                 (#(on-mark-change [:point %]))))))
     feature))
 
 (defmulti update-mark-feature (fn [props feature] (first props)))
