@@ -211,7 +211,7 @@
     (will-unmount [_]
       (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
 
-(defn BoxMap [props owner]
+(defn BoxMap [{:keys [on-mark-change] :as props} owner]
   (reify
     om/IDisplayName (display-name [_] "BoxMap")
     om/IInitState
@@ -248,9 +248,10 @@
       (html [:div.map {:ref "map"}
              (om/build-all Mark
                            (map-indexed
-                             (fn [idx value] {:value value
-                                              :idx idx
-                                              :on-mark-change (:on-mark-change props)})
-                             (:value props))
+                            (fn [idx value] {:value          value
+                                             :idx            idx
+                                             :on-mark-change (and on-mark-change
+                                                                  (partial on-mark-change idx))})
+                            (:value props))
                            {:init-state
                             {:source (om/get-state owner :source)}})]))))

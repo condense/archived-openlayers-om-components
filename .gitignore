@@ -6,3 +6,4 @@
 /*.iml
 examples/*/out
 examples/*/main.js
+/pom.xml

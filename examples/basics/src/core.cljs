@@ -52,10 +52,10 @@
            [:h2 "BoxMap"]
            [:p "Allows one bounding box to be drawn (hold down shift)."]
            (om/build BoxMap
-                     {:value     [mark]
-                      :on-boxend #(om/update! mark [:box (js->clj %)])
-                      :on-click  #(om/update! mark [:point (js->clj %)])
-                      :on-mark-change #(om/update! mark (js->clj %))})
+                     {:value          [mark]
+                      :on-boxend      #(om/update! mark [:box (js->clj %)])
+                      :on-click       #(om/update! mark [:point (js->clj %)])
+                      :on-mark-change #(om/update! mark %2)})
            [:p (om/build DisplayExtent (mark 1))]]
 
           [:div.col-sm-6
@@ -66,7 +66,7 @@
                      {:value     marks
                       :on-boxend #(add-mark! marks :box %)
                       :on-click #(add-mark! marks :point %)
-                      :on-mark-change #(println :on-mark-change %)})
+                      :on-mark-change #(println :on-mark-change %1 %2)})
 
            [:table.table.table-hover
             [:thead [:tr
