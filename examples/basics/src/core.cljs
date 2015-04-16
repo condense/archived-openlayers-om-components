@@ -66,7 +66,8 @@
                      {:value     marks
                       :on-boxend #(add-mark! marks :box %)
                       :on-click #(add-mark! marks :point %)
-                      :on-mark-change #(println :on-mark-change %1 %2)})
+                      :mark-change-debounce 100
+                      :on-mark-change #(om/update! marks [%1] %2)})
 
            [:table.table.table-hover
             [:thead [:tr

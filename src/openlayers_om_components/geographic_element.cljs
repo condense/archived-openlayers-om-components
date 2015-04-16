@@ -1,5 +1,6 @@
 (ns openlayers-om-components.geographic-element
-  (:require-macros [openlayers-om-components.debug :refer [inspect]])
+  (:require-macros [cljs.core.async.macros :refer [go-loop alt!]]
+                   [openlayers-om-components.debug :refer [inspect]])
   (:require ol.Map
             ol.Collection
             ol.layer.Tile
@@ -20,11 +21,28 @@
             ol.events.condition
             ol.geom.Polygon
             ol.geom.Point
+            [cljs.core.async :refer [chan <! >! timeout put! close!]]
             [om.core :as om :include-macros true]
             [sablono.core :as html :refer-macros [html]]))
 
 (defn fmap [f m]
   (into (empty m) (for [[k v] m] [k (f v)])))
+
+(defn debounce
+  "Creates a channel which will change put a new value to the output channel
+   after timeout has passed. Each value change resets the timeout. If value
+   changes more frequently only the latest value is put out.
+
+   When input channel closes, the output channel is closed."
+  [in ms]
+  (let [out (chan)]
+    (go-loop [last-val nil]
+      (let [val (if (nil? last-val) (<! in) last-val)
+            timer (timeout ms)]
+        (alt!
+          in    ([v] (if v (recur v) (close! out)))
+          timer ([_] (do (>! out val) (recur nil))))))
+    out))
 
 ; TODO: Modify interactions
 ; http://openlayers.org/ol3-workshop/controls/modify.html
@@ -142,32 +160,26 @@
 
 (defmulti create-mark-feature first)
 
-(defmethod create-mark-feature :box [[_ extent :as props] on-mark-change]
+(defmethod create-mark-feature :box [[_ extent] ch]
   (let [feature (-> extent clj->js
                     (ol.proj.transformExtent "EPSG:4326" "EPSG:3857")
                     ol.geom.Polygon.fromExtent
                     ol.Feature.)]
-    (when on-mark-change
-      (.on feature "change"
-           (fn [e]
-             (-> e .-target .getGeometry .getExtent
-                 (ol.proj.transformExtent "EPSG:3857" "EPSG:4326")
-                 js->clj
-                 (#(on-mark-change [:box %]))))))
+    (.on feature "change"
+         #(put! ch [:box (ol.proj.transformExtent
+                          (.. % -target getGeometry getExtent)
+                          "EPSG:3857" "EPSG:4326")]))
     feature))
 
-(defmethod create-mark-feature :point [[_ coords :as props] on-mark-change]
+(defmethod create-mark-feature :point [[_ coords] ch]
   (let [feature (-> coords clj->js
                     (ol.proj.transform "EPSG:4326" "EPSG:3857")
                     ol.geom.Point.
                     ol.Feature.)]
-    (when on-mark-change
-      (.on feature "change"
-           (fn [e]
-             (-> e .-target .getGeometry .getCoordinates
-                 (ol.proj.transform "EPSG:3857" "EPSG:4326")
-                 js->clj
-                 (#(on-mark-change [:point %]))))))
+    (.on feature "change"
+         #(put! ch [:point (ol.proj.transform
+                            (.. % -target getGeometry getCoordinates)
+                            "EPSG:3857" "EPSG:4326")]))
     feature))
 
 (defmulti update-mark-feature (fn [props feature] (first props)))
@@ -188,19 +200,29 @@
 
 (defn replace-mark-feature [value owner]
   (let [source (om/get-state owner :source)
-        feature (create-mark-feature value (om/get-props owner :on-mark-change))]
+        feature (create-mark-feature value (om/get-state owner :>change))]
     (when-let [feature (om/get-state owner :feature)]
       (.remove source feature))
     (.push (om/get-state owner :source) feature)
     (om/set-state! owner :feature feature)))
 
-(defn Mark [{:keys [value]} owner]
+(defn Mark [{:keys [value mark-change-debounce on-mark-change]} owner]
   (reify
     om/IDisplayName (display-name [_] "Mark")
     om/IRender (render [_])
+    om/IInitState
+    (init-state [_]
+      (let [>change (chan)]
+        {:>change >change
+         :<change (debounce >change (or mark-change-debounce 200))}))
     om/IDidMount
     (did-mount [_]
-      (replace-mark-feature value owner))
+      (replace-mark-feature value owner)
+      (go-loop []
+        (when-let [[t v] (<! (om/get-state owner :<change))]
+          (when on-mark-change
+            (on-mark-change [t (js->clj v)]))
+          (recur))))
     om/IDidUpdate
     (did-update [_ {prev-value :value} _]
       (when-not (= value prev-value)
@@ -211,7 +233,7 @@
     (will-unmount [_]
       (.remove (om/get-state owner :source) (om/get-state owner :feature)))))
 
-(defn BoxMap [{:keys [on-mark-change] :as props} owner]
+(defn BoxMap [{:keys [on-mark-change mark-change-debounce] :as props} owner]
   (reify
     om/IDisplayName (display-name [_] "BoxMap")
     om/IInitState
@@ -248,10 +270,12 @@
       (html [:div.map {:ref "map"}
              (om/build-all Mark
                            (map-indexed
-                            (fn [idx value] {:value          value
-                                             :idx            idx
-                                             :on-mark-change (and on-mark-change
-                                                                  (partial on-mark-change idx))})
+                            (fn [idx value]
+                              {:value                value
+                               :idx                  idx
+                               :mark-change-debounce mark-change-debounce
+                               :on-mark-change       (and on-mark-change
+                                                          (partial on-mark-change idx))})
                             (:value props))
                            {:init-state
                             {:source (om/get-state owner :source)}})]))))
