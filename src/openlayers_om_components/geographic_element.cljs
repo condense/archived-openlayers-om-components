@@ -131,6 +131,12 @@
         map (ol.Map. #js {:layers #js [raster vectorLayer]
                           :target node
                           :view   view})]
+    (when-let [f (:on-view-change props)]
+      (doseq [t ["center" "rotation" "resolution"]]
+        (.on view (str "change:" t)
+             #(-> (.calculateExtent view (.getSize map))
+                  (ol.proj.transformExtent "EPSG:3857" "EPSG:4326")
+                  js->clj f))))
     (.on map "click" (fn [e]
                        (when (and (.. e -browserEvent -shiftKey)
                                   (zero? (.. e -browserEvent -button))

@@ -66,6 +66,7 @@
                      {:value     marks
                       :on-boxend #(add-mark! marks :box %)
                       :on-click #(add-mark! marks :point %)
+                      :on-view-change #(print %)
                       :mark-change-debounce 100
                       :on-mark-change #(om/update! marks [%1] %2)})
 
