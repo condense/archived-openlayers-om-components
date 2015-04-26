@@ -99,7 +99,7 @@
         raster (ol.layer.Tile. #js {:source source})
         view (ol.View. #js {:center #js [-11000000 4600000]
                             :zoom 4
-                            :maxZoom 10})
+                            :maxZoom (get props :max-zoom 18)})
         vectorSource (ol.source.Vector.
                       #js {:projection (ol.proj.get "EPSG:4326")
                            :features   #js []})

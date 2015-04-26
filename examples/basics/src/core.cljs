@@ -55,7 +55,8 @@
                      {:value          [mark]
                       :on-boxend      #(om/update! mark [:box (js->clj %)])
                       :on-click       #(om/update! mark [:point (js->clj %)])
-                      :on-mark-change #(om/update! mark %2)})
+                      :on-mark-change #(om/update! mark %2)
+                      :max-zoom       13})
            [:p (om/build DisplayExtent (mark 1))]]
 
           [:div.col-sm-6
