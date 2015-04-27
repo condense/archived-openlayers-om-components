@@ -95,7 +95,7 @@
 
 (defn init-map! [owner props]
   (let [node (om/get-node owner "map")
-        source (ol.source.MapQuest. #js {:layer "sat"})
+        source (ol.source.MapQuest. #js {:layer "hyb"})
         raster (ol.layer.Tile. #js {:source source})
         view (ol.View. #js {:center #js [-11000000 4600000]
                             :zoom 4
